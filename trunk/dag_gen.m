@@ -1,0 +1,69 @@
+%Dag generation
+
+ % %生成数据
+% % 1.1输入N组用例,
+% % //DAG
+% % 2.1.输入DAG的节点数P
+% % 2.2.有P行，每一行第一个数据是每个节点的CPU权值和GPU权值
+% % 2.3.输入边数E，E<=P^2
+% % 2.4.有E行数据，每行第一个数据是边的起始节点，第二个是结束节点，第三个是数据量（权值）
+
+clear all
+
+N = 10;%输入1000组用例
+% % 2.1.输入DAG的节点数P
+P = 10;  %生成DAG图的节点数量
+
+
+%%2.2生成第一个数据是每个任务节点的权值，包括CPU的计算量和GPU的计算量
+PMu = 1000;%均值为100
+PSigma = 300;%方差20
+PCPUWeight = abs((normrnd(PMu,PSigma,[N,P])));%均值为100，方差50,生成N组，每组有P个数
+PGPUWeight = abs((normrnd(PMu,PSigma,[N,P])));
+
+%%2.3.输入边数E，E<=P^2
+E = 14;
+% % 2.4.有E行数据，每行第一个数据是边的起始节点，第二个是结束节点，第三个是权值
+%EWeightUnit = 50;%需要传递的数据的数量级
+EMu = 100;%均值为50
+ESigma = 30;%方差20
+EWeight = abs((normrnd(EMu,ESigma,[N,E])));
+%建立边
+Edge = [1,2;
+        1,3;
+		1,4;
+        1,5;
+        2,6;
+        3,6;
+        4,7;
+		4,8;
+		4,9;
+		5,7;
+		6,9;
+		7,10;
+		8,10;
+		9,10;
+        ];
+Edge = Edge -1;
+
+% %文件操作
+%写DAG部分
+
+for fi = 1 : N
+    DAGName0 ='DAG.in';
+    NameNum = num2str(fi);
+    Txt = '.txt';
+    DAGName = [DAGName0, NameNum, Txt];
+    DAGFile = fopen(DAGName,'wt');
+    fprintf(DAGFile, '%d\n', P);
+    for pi = 1 : P
+        fprintf(DAGFile, '%f %f\n', PCPUWeight(fi, pi), PGPUWeight(fi, pi));
+    end
+    fprintf(DAGFile, '%d\n', E);
+    
+    for ei = 1 : E
+        fprintf(DAGFile, '%d %d %f\n', Edge(ei,1), Edge(ei,2),  EWeight(fi, ei));
+    end
+    fprintf(DAGFile, '\n');
+    fclose(DAGFile);
+end

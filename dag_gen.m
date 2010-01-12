@@ -9,6 +9,10 @@
 % % 2.4.有E行数据，每行第一个数据是边的起始节点，第二个是结束节点，第三个是数据量（权值）
 
 clear all
+%第二版代码
+%本代码考虑CPU与GPU协同工作的情况，即某一项任务需要同一节点中的CPU和GPU同时协同工作
+%也考虑逻辑运算与算术运算的不同，即CPU与GPU的逻辑运算和算术运算的速度不同，一项任务有逻辑运算量和算术运算量
+
 
 N = 10;%输入1000组用例
 % % 2.1.输入DAG的节点数P
@@ -16,10 +20,15 @@ P = 10;  %生成DAG图的节点数量
 
 
 %%2.2生成第一个数据是每个任务节点的权值，包括CPU的计算量和GPU的计算量
-PMu = 1000;%均值为100
+P_CPU_logic_Mu = 1000;%均值为100
+P_CPU_arith_Mu = 300;
+P_GPU_logic_Mu = 300;
+P_GPU_arith_Mu = 1000;
 PSigma = 300;%方差20
-PCPUWeight = abs((normrnd(PMu,PSigma,[N,P])));%均值为100，方差50,生成N组，每组有P个数
-PGPUWeight = abs((normrnd(PMu,PSigma,[N,P])));
+P_CPU_logic_Weight = abs(normrnd(P_CPU_logic_Mu,PSigma,[N,P]));%均值为100，方差50,生成N组，每组有P个数
+P_CPU_arith_Weight = abs(normrnd(P_CPU_arith_Mu,PSigma,[N,P]));
+P_GPU_logic_Weight = abs(normrnd(P_GPU_logic_Mu,PSigma,[N,P]));
+P_GPU_arith_Weight = abs(normrnd(P_GPU_arith_Mu,PSigma,[N,P]));
 
 %%2.3.输入边数E，E<=P^2
 E = 14;
@@ -57,7 +66,8 @@ for fi = 1 : N
     DAGFile = fopen(DAGName,'wt');
     fprintf(DAGFile, '%d\n', P);
     for pi = 1 : P
-        fprintf(DAGFile, '%f %f\n', PCPUWeight(fi, pi), PGPUWeight(fi, pi));
+        fprintf(DAGFile, '%f %f\n', P_CPU_logic_Weight(fi, pi), P_CPU_arith_Weight(fi, pi));
+		fprintf(DAGFile, '%f %f\n', P_GPU_logic_Weight(fi, pi), P_GPU_arith_Weight(fi, pi));
     end
     fprintf(DAGFile, '%d\n', E);
     

@@ -1,4 +1,8 @@
-//本代码没有考虑CPU与GPU同时协同工作的情况，也没有考虑逻辑运算和算术运算的不同
+/*
+第二版代码
+本代码考虑CPU与GPU协同工作的情况，即某一项任务需要同一节点中的CPU和GPU同时协同工作
+也考虑逻辑运算与算术运算的不同，即CPU与GPU的逻辑运算和算术运算的速度不同，一项任务有逻辑运算量和算术运算量
+*/
 
 
 #include <iostream>
@@ -17,10 +21,12 @@ using namespace std;
 class task
 {
 	public:
-		task(float comp_cpu=0, float comp_gpu=0);
+		task();
 		void assign(int node_num, int proc, int proc_num);
-		float computation_cpu;
-		float computation_gpu;
+		float computation_cpu_logic;
+		float computation_cpu_arith;
+		float computation_gpu_logic;
+		float computation_gpu_arith;
 		float data_volume;
 		int dependency;
 		int assign_node;
@@ -35,16 +41,19 @@ class node
 	public:
 		node();
 
-		float cpu_speed[MAX_CPU_NUM];
+		float cpu_speed_logic[MAX_CPU_NUM];
+		float cpu_speed_arith[MAX_CPU_NUM];
 		int cpu_num;
 		float eth_bandwidth;
-		float gpu_speed[MAX_GPU_NUM];
+		float gpu_speed_logic[MAX_GPU_NUM];
+		float gpu_speed_arith[MAX_GPU_NUM];
 		float gpu_bandwidth[MAX_GPU_NUM];
 		int gpu_num;
 		float cpu_ready_time[MAX_CPU_NUM];
 		float gpu_ready_time[MAX_GPU_NUM];
 		float cpu_utilized_time;
 		float gpu_utilized_time;
+		float node_ready_time;
 };
 
 class dependency
@@ -65,7 +74,7 @@ class main_class
 		void schedule();
 		float eth_transfer_time(int task_n, int node_n);
 		void assign(int task_n, int node_n, int proc, int proc_n);
-		float exe_time(int task_n, int node_n, int proc, int proc_n);
+		float exe_time(int task_n, int node_n, int proc_cpu, int proc_gpu);
 		void get_ready_time(int task_n);
 	private:
 		task *pTask[MAX_TASK_NUM];
@@ -76,10 +85,12 @@ class main_class
 		int dependency_num;
 };
 
-task::task(float comp_cpu, float comp_gpu)
+task::task()
 {
-	computation_cpu = comp_cpu;
-	computation_gpu = comp_gpu;
+	computation_cpu_logic = 0;
+	computation_cpu_arith = 0;
+	computation_gpu_logic = 0;
+	computation_gpu_arith = 0;
 	data_volume = 0;
 	dependency = 0;
 	assign_node = -1;
@@ -119,18 +130,21 @@ node::node()
 	gpu_num = 0;
 	for(int i=0;i<MAX_CPU_NUM;i++)
 	{
-		cpu_speed[i] = 0;
+		cpu_speed_logic[i] = 0;
+		cpu_speed_arith[i] = 0;
 		cpu_ready_time[i] = 0;
 	}
 	for(int i=0;i<MAX_GPU_NUM;i++)
 	{
-		gpu_speed[i] = 0;
+		gpu_speed_logic[i] = 0;
+		gpu_speed_arith[i] = 0;
 		gpu_bandwidth[i] = 0;
 		gpu_ready_time[i] = 0;
 	}
 	eth_bandwidth = 0;
 	cpu_utilized_time = 0;
 	gpu_utilized_time = 0;
+	node_ready_time = 0;
 }
 
 dependency::dependency()
@@ -189,14 +203,14 @@ void main_class::readin_data()
 		i_file >> pNode[i]->cpu_num;
 		for(int j=0;j<pNode[i]->cpu_num;j++)
 		{
-			i_file >> pNode[i]->cpu_speed[j];
+			i_file >> pNode[i]->cpu_speed_logic[j] >> pNode[i]->cpu_speed_arith[j];
 //			cout << pNode[i]->cpu_speed[j] << " ";
 		}
 		i_file >> pNode[i]->gpu_num;
 //		cout << pNode[i]->gpu_num << endl;
 		for(int j=0;j<pNode[i]->gpu_num;j++)
 		{
-			i_file >> pNode[i]->gpu_speed[j] >> pNode[i]->gpu_bandwidth[j];
+			i_file >> pNode[i]->gpu_speed_logic[j] >> pNode[i]->gpu_speed_arith[j] >> pNode[i]->gpu_bandwidth[j];
 		}
 		i_file >> pNode[i]->eth_bandwidth;
 	}
@@ -209,7 +223,8 @@ void main_class::readin_data()
 	for(int i=0;i<task_num;i++)
 	{
 		pTask[i] = new task();
-		i_file >> pTask[i]->computation_cpu >> pTask[i]->computation_gpu;
+		i_file >> pTask[i]->computation_cpu_logic >> pTask[i]->computation_cpu_arith;
+		i_file >> pTask[i]->computation_gpu_logic >> pTask[i]->computation_gpu_arith;
 	}
 	
 	i_file >> dependency_num;
@@ -218,6 +233,8 @@ void main_class::readin_data()
 	{
 		pDependency[i] = new dependency();
 		i_file >> pDependency[i]->output_task >> pDependency[i]->input_task >> pDependency[i]->data_volume;
+		
+		//修改相关数据
 		int temp_input_task = pDependency[i]->input_task;
 		pTask[temp_input_task]->dependency++;
 		pTask[temp_input_task]->data_volume += pDependency[i]->data_volume;
@@ -253,18 +270,25 @@ void main_class::get_ready_time(int task_n)
 	return ;
 }
  
-float main_class::exe_time(int task_n, int node_n, int proc, int proc_n)
+float main_class::exe_time(int task_n, int node_n, int proc_cpu, int proc_gpu)
 {	//返回计算消耗的时间长度
-	if (proc==0)	//CPU execution
-	{
-		return pTask[task_n]->computation_cpu / pNode[node_n]->cpu_speed[proc_n];
-	}
-	else		//GPU execution
-	{
-//		return gpu_exe_time(task_n, node_n, proc, proc_n);
-//现在只是简单将GPU传输时间与计算时间相加，以后可以通过gpu_exe_time函数做的复杂些
-		return pTask[task_n]->computation_gpu / pNode[node_n]->gpu_speed[proc_n] + pTask[task_n]->data_volume / pNode[node_n]->gpu_bandwidth[proc_n];
-	}
+	//这里做一个简化，认为数据到达本节点后，CPU可以立即开始计算，同时数据通过PCI向GPU传输，
+	//GPU得到数据后马上开始计算并在计算后立即传回数据
+	//总的计算时间取决于CPU计算时间和GPU的数据传输+计算，二者取最大值
+	//这里假设一个任务需要一个节点中的一个CPU和一个GPU同时进行计算
+	float cpu_time,gpu_time;
+	
+	cpu_time = pTask[task_n]->computation_cpu_logic / pNode[node_n]->cpu_speed_logic[proc_cpu]
+				+ pTask[task_n]->computation_cpu_arith / pNode[node_n]->cpu_speed_arith[proc_cpu];
+	
+	gpu_time = 2 * pTask[task_n]->data_volume / pNode[node_n]->gpu_bandwidth[proc_gpu]
+				+ pTask[task_n]->computation_gpu_logic / pNode[node_n]->gpu_speed_logic[proc_gpu]
+				+ pTask[task_n]->computation_cpu_arith / pNode[node_n]->gpu_speed_arith[proc_gpu];
+	
+	if (cpu_time > gpu_time)
+		return cpu_time;
+	else
+		return gpu_time;
 }
 
 float main_class::eth_transfer_time(int task_n, int node_n)
@@ -299,42 +323,42 @@ float main_class::eth_transfer_time(int task_n, int node_n)
 	return max_time;
 }
 
-void main_class::assign(int task_n, int node_n, int proc, int proc_n)
+void main_class::assign(int task_n, int node_n, int proc_cpu, int proc_gpu)
 {
 	if (pTask[task_n]->dependency != 0)
 		cout << "Dependency error, cannot execute  main:assign" << endl;
 	
 	//这里似乎需要简化，因为任务结束时间不可能比数据到达时间更早
-	if (pTask[task_n]->data_ready_time > pTask[task_n]->ready_time)
+	if (pTask[task_n]->data_ready_time >= pTask[task_n]->ready_time)
 	{
 		pTask[task_n]->begin_time = pTask[task_n]->data_ready_time;
 	}else
 	{
+		cout << "This is for test use main_class::assign" << endl;
 		pTask[task_n]->begin_time = pTask[task_n]->ready_time;
 	}
 	
 	//考虑任务等待处理器的情况
-	if(proc == 0)
+	if(pNode[node_n]->cpu_ready_time[proc_cpu] > pTask[task_n]->begin_time)
 	{
-		if (pNode[node_n]->cpu_ready_time[proc_n] > pTask[task_n]->begin_time)
-			pTask[task_n]->begin_time = pNode[node_n]->cpu_ready_time[proc_n];
-	}else
-	{
-		if (pNode[node_n]->gpu_ready_time[proc_n] > pTask[task_n]->begin_time)
-			pTask[task_n]->begin_time = pNode[node_n]->gpu_ready_time[proc_n];
+		pTask[task_n]->begin_time = pNode[node_n]->cpu_ready_time[proc_cpu];
 	}
-	
+	if(pNode[node_n]->gpu_ready_time[proc_gpu] > pTask[task_n]->begin_time)
+	{
+		pTask[task_n]->begin_time = pNode[node_n]->gpu_ready_time[proc_gpu];
+	}
+		
 	pTask[task_n]->assign_node = node_n;
-	pTask[task_n]->finish_time = pTask[task_n]->begin_time + exe_time(task_n, node_n, proc, proc_n);
-	if (proc == 0)
-	{	//CPU执行
-		pNode[node_n]->cpu_ready_time[proc_n] = pTask[task_n]->finish_time;
-		pNode[node_n]->cpu_utilized_time += pTask[task_n]->finish_time - pTask[task_n]->begin_time;
-	}else
-	{	//GPU执行
-		pNode[node_n]->gpu_ready_time[proc_n] = pTask[task_n]->finish_time;
-		pNode[node_n]->gpu_utilized_time += pTask[task_n]->finish_time - pTask[task_n]->begin_time;
-	}
+	pTask[task_n]->finish_time = pTask[task_n]->begin_time + exe_time(task_n, node_n, proc_cpu, proc_gpu);
+
+	//CPU执行
+	pNode[node_n]->cpu_ready_time[proc_cpu] = pTask[task_n]->finish_time;
+	pNode[node_n]->cpu_utilized_time += pTask[task_n]->finish_time - pTask[task_n]->begin_time;
+
+	//GPU执行
+	pNode[node_n]->gpu_ready_time[proc_gpu] = pTask[task_n]->finish_time;
+	pNode[node_n]->gpu_utilized_time += pTask[task_n]->finish_time - pTask[task_n]->begin_time;
+
 //	cout << "task " << task_n << "begin_time:" << pTask[task_n]->begin_time << endl;
 //	cout << "task " << task_n << "finish_time:" << pTask[task_n]->finish_time << endl;
 //	cout << "task " << task_n << "assigned node:" << node_n << (proc_n>0?" CPU":" GPU") << "core:" << proc_n << endl;
@@ -383,20 +407,22 @@ void main_class::schedule()
 			}
 		}
 		
-		//分别找出CPU和GPU的ready_time最早的node
-		int earlist_ready_cpu_node = 0;
+		//分别找出ready_time最早的node
+		//node的ready_time等于其中最早CPU与最早GPU的ready_time的较大值，即最早何时能同时拿出一个CPU和一个GPU
+		//下面的代码需要修改
+		int earlist_ready_node = 0, earlist_ready_node_cpu = 0, earlist_ready_node_gpu = 0;
 		int earlist_ready_cpu_proc = 0;
 		float earlist_ready_cpu_time = pNode[0]->cpu_ready_time[0];
-		int earlist_ready_gpu_node = 0;
 		int earlist_ready_gpu_proc = 0;
 		float earlist_ready_gpu_time = pNode[0]->gpu_ready_time[0];
+		float earlist_ready_node_time;
+		earlist_ready_node_time = earlist_ready_cpu_time>earlist_ready_gpu_time?earlist_ready_cpu_time:earlist_ready_gpu_time;
 		for (int i=0;i<node_num;i++)
 		{
 			for (int j=0;j<pNode[i]->cpu_num;j++)
 			{
 				if (pNode[i]->cpu_ready_time[j] < earlist_ready_cpu_time)
 				{
-					earlist_ready_cpu_node = i;
 					earlist_ready_cpu_proc = j;
 					earlist_ready_cpu_time = pNode[i]->cpu_ready_time[j];
 				}
@@ -405,17 +431,23 @@ void main_class::schedule()
 			{
 				if (pNode[i]->gpu_ready_time[j] < earlist_ready_gpu_time)
 				{
-					earlist_ready_gpu_node = i;
 					earlist_ready_gpu_proc = j;
 					earlist_ready_gpu_time = pNode[i]->gpu_ready_time[j];
 				}
 			}
+			if(earlist_ready_cpu_time<earlist_ready_node_time && earlist_ready_gpu_time<earlist_ready_node_time)
+			{
+				earlist_ready_node = i;
+				earlist_ready_node_cpu = earlist_ready_cpu_proc;
+				earlist_ready_node_gpu = earlist_ready_gpu_proc;
+				if(earlist_ready_cpu_time > earlist_ready_gpu_time)
+					earlist_ready_node_time = earlist_ready_cpu_time;
+				else
+					earlist_ready_node_time = earlist_ready_gpu_time;
+			}
 		}
-		
-		if (exe_time(earlist_ready_task, earlist_ready_cpu_node, 0, earlist_ready_cpu_proc) < exe_time(earlist_ready_task, earlist_ready_gpu_node, 1, earlist_ready_gpu_proc))
-			assign(earlist_ready_task, earlist_ready_cpu_node, 0, earlist_ready_cpu_proc);//CPU更快
-		else
-			assign(earlist_ready_task, earlist_ready_gpu_node, 1, earlist_ready_gpu_proc);//GPU更快
+		pTask[earlist_ready_task]->data_ready_time = eth_transfer_time(earlist_ready_task, earlist_ready_node);
+		assign(earlist_ready_task, earlist_ready_node, earlist_ready_node_cpu, earlist_ready_node_gpu);
 		task_count--;
 	}
 	

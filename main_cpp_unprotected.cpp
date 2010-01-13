@@ -4,7 +4,6 @@
 也考虑逻辑运算与算术运算的不同，即CPU与GPU的逻辑运算和算术运算的速度不同，一项任务有逻辑运算量和算术运算量
 */
 
-
 #include <iostream>
 #include <fstream>
 #include <windows.h>

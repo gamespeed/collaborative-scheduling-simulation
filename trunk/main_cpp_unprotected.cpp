@@ -215,7 +215,8 @@ void main_class::readin_data()
 	}
 	
 	i_file.close();
-	i_file.open("DAG.in1.txt");
+//	i_file.open("DAG.in1.txt");
+	i_file.open("DAG.dup.in1.txt");
 	
 	i_file >> task_num;
 //	cout << "task_num" << task_num << endl;
@@ -335,6 +336,8 @@ float main_class::eth_transfer_time(int task_n, int node_n)
 
 void main_class::assign(int task_n, int node_n, int proc_cpu, int proc_gpu)
 {
+	int temp_task_n;
+	
 	if (pTask[task_n]->dependency != 0)
 		cout << "Dependency error, cannot execute  main:assign" << endl;
 	
@@ -378,7 +381,7 @@ void main_class::assign(int task_n, int node_n, int proc_cpu, int proc_gpu)
 	{
 		if (pDependency[i]->output_task == task_n)
 		{	//找到task_n的后续节点
-			int temp_task_n = pDependency[i]->input_task;
+			temp_task_n = pDependency[i]->input_task;
 			pTask[temp_task_n]->dependency --;
 			if (pTask[temp_task_n]->dependency == 0)
 			{
@@ -393,10 +396,18 @@ void main_class::schedule()
 	int task_count;
 	task_count = task_num;
 	
+	float earlist_ready_time;
+	int earlist_ready_task;
+	int earlist_ready_node = 0, earlist_ready_node_cpu = 0, earlist_ready_node_gpu = 0;
+	int earlist_ready_cpu_proc = 0;	//临时变量
+	float earlist_ready_cpu_time = pNode[0]->cpu_ready_time[0];	//初始化
+	int earlist_ready_gpu_proc = 0;	//临时变量
+	float earlist_ready_gpu_time = pNode[0]->gpu_ready_time[0];
+	float earlist_ready_node_time;	//临时变量
+	
  	while(task_count > 0)
 	{	//找出ready_time最早的任务
-		float earlist_ready_time;
-		int earlist_ready_task;
+
 		earlist_ready_time = -1;
 		earlist_ready_task = -1;
 		for (int i=0;i<task_num;i++)
@@ -423,15 +434,15 @@ void main_class::schedule()
 		//分别找出ready_time最早的node
 		//node的ready_time等于其中最早CPU与最早GPU的ready_time的较大值，即最早何时能同时拿出一个CPU和一个GPU
 		//下面的代码需要修改
-		int earlist_ready_node = 0, earlist_ready_node_cpu = 0, earlist_ready_node_gpu = 0;
+		earlist_ready_node = 0, earlist_ready_node_cpu = 0, earlist_ready_node_gpu = 0;
 		
-		int earlist_ready_cpu_proc = 0;	//临时变量
-		float earlist_ready_cpu_time = pNode[0]->cpu_ready_time[0];	//初始化
+		earlist_ready_cpu_proc = 0;	//临时变量
+		earlist_ready_cpu_time = pNode[0]->cpu_ready_time[0];	//初始化
 		
-		int earlist_ready_gpu_proc = 0;	//临时变量
-		float earlist_ready_gpu_time = pNode[0]->gpu_ready_time[0];
+		earlist_ready_gpu_proc = 0;	//临时变量
+		earlist_ready_gpu_time = pNode[0]->gpu_ready_time[0];
 		
-		float earlist_ready_node_time;	//临时变量
+//		earlist_ready_node_time;	//临时变量
 		earlist_ready_node_time = earlist_ready_cpu_time>earlist_ready_gpu_time?earlist_ready_cpu_time:earlist_ready_gpu_time;
 		for (int i=0;i<node_num;i++)
 		{
@@ -464,11 +475,13 @@ void main_class::schedule()
 		}
 		pTask[earlist_ready_task]->data_ready_time = eth_transfer_time(earlist_ready_task, earlist_ready_node);
 		assign(earlist_ready_task, earlist_ready_node, earlist_ready_node_cpu, earlist_ready_node_gpu);
-		cout << "assign task " << earlist_ready_task << " on node " << earlist_ready_node << 
-			" CPU:" << earlist_ready_node_cpu << " GPU:" << earlist_ready_node_gpu << " Time:" << pTask[earlist_ready_task]->begin_time <<
-			" - " << pTask[earlist_ready_task]->finish_time << endl;
+		
+//		cout << "assign task " << earlist_ready_task << " on node " << earlist_ready_node << 
+//			" CPU:" << earlist_ready_node_cpu << " GPU:" << earlist_ready_node_gpu << " Time:" << pTask[earlist_ready_task]->begin_time <<
+//			" - " << pTask[earlist_ready_task]->finish_time << endl;
+		
 		task_count--;
-		cout << "Schedule " << task_num - task_count << " tasks" << endl;
+//		cout << "Schedule " << task_num - task_count << " tasks" << endl;
 	}
 	
 	float last_task_time = pTask[0]->finish_time;
@@ -484,10 +497,13 @@ void main_class::schedule()
 	}
 	for (int i=0;i<node_num;i++)
 	{
-		cout << "Node:" << i << " CPU Utilization Rate:" << pNode[i]->cpu_utilized_time / pNode[i]->cpu_num / last_task_time << endl;
-		cout << "Node:" << i << " GPU Utilization Rate:" << pNode[i]->gpu_utilized_time / pNode[i]->gpu_num / last_task_time << endl;
+//		cout << "Node:" << i << " CPU Utilization Rate:" << pNode[i]->cpu_utilized_time / pNode[i]->cpu_num / last_task_time << endl;
+//		cout << "Node:" << i << " GPU Utilization Rate:" << pNode[i]->gpu_utilized_time / pNode[i]->gpu_num / last_task_time << endl;
+		cout << pNode[i]->cpu_utilized_time / pNode[i]->cpu_num / last_task_time << " ";
+		cout << pNode[i]->gpu_utilized_time / pNode[i]->gpu_num / last_task_time << endl;
 	}
-	cout << "The makespan :" << last_task_time << endl;
+//	cout << "The makespan :" << last_task_time << endl;
+	cout << last_task_time << endl;
 }
 
 //int main(int argc, char *argv[])
@@ -497,10 +513,10 @@ int main()
 //		cout << "Parameter number error" << endl;
 	main_class *mMain = new main_class();
 	mMain->readin_data();
-	cout << "readin_data success" << endl;
+//	cout << "readin_data success" << endl;
 	mMain->schedule();
-	cout << "schedule success" << endl;
+//	cout << "schedule success" << endl;
 	delete mMain;
-	system("pause");
+//	system("pause");
 	return 0;
 }

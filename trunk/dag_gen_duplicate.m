@@ -13,9 +13,12 @@ clear all
 %本代码考虑CPU与GPU协同工作的情况，即某一项任务需要同一节点中的CPU和GPU同时协同工作
 %也考虑逻辑运算与算术运算的不同，即CPU与GPU的逻辑运算和算术运算的速度不同，一项任务有逻辑运算量和算术运算量
 
+%本代码生成几个同样的DAG图，用于增大总任务量
+
 N = 10;%输入1000组用例
 % % 2.1.输入DAG的节点数P
 P = 10;  %生成DAG图的节点数量
+M = 9;%DAG图的重复次数
 
 
 %%2.2生成第一个数据是每个任务节点的权值，包括CPU的计算量和GPU的计算量
@@ -58,21 +61,25 @@ Edge = Edge -1;
 %写DAG部分
 
 for fi = 1 : N
-    DAGName0 ='DAG.in';
+    DAGName0 ='DAG.dup.in';
     NameNum = num2str(fi);
     Txt = '.txt';
     DAGName = [DAGName0, NameNum, Txt];
     DAGFile = fopen(DAGName,'wt');
-    fprintf(DAGFile, '%d\n', P);
-    for pi = 1 : P
-        fprintf(DAGFile, '%f %f\n', P_CPU_logic_Weight(fi, pi), P_CPU_arith_Weight(fi, pi));
-		fprintf(DAGFile, '%f %f\n', P_GPU_logic_Weight(fi, pi), P_GPU_arith_Weight(fi, pi));
-    end
-    fprintf(DAGFile, '%d\n', E);
+    fprintf(DAGFile, '%d\n', P*M);
+	for mi = 1 : M
+		for pi = 1 : P
+			fprintf(DAGFile, '%f %f\n', P_CPU_logic_Weight(fi, pi), P_CPU_arith_Weight(fi, pi));
+			fprintf(DAGFile, '%f %f\n', P_GPU_logic_Weight(fi, pi), P_GPU_arith_Weight(fi, pi));
+		end
+	end
+    fprintf(DAGFile, '%d\n', E*M);
     
-    for ei = 1 : E
-        fprintf(DAGFile, '%d %d %f\n', Edge(ei,1), Edge(ei,2),  EWeight(fi, ei));
-    end
+	for mi = 1 : M
+		for ei = 1 : E
+			fprintf(DAGFile, '%d %d %f\n', Edge(ei,1) + (mi-1)*P, Edge(ei,2) + (mi-1)*P,  EWeight(fi, ei));
+		end
+	end
 %    fprintf(DAGFile, '\n');
     fclose(DAGFile);
 end

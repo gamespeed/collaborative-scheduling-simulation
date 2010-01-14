@@ -52,7 +52,7 @@ class node
 		float gpu_ready_time[MAX_GPU_NUM];
 		float cpu_utilized_time;
 		float gpu_utilized_time;
-		float node_ready_time;
+//		float node_ready_time;
 };
 
 class dependency
@@ -143,7 +143,7 @@ node::node()
 	eth_bandwidth = 0;
 	cpu_utilized_time = 0;
 	gpu_utilized_time = 0;
-	node_ready_time = 0;
+//	node_ready_time = 0;
 }
 
 dependency::dependency()
@@ -268,7 +268,7 @@ void main_class::get_ready_time(int task_n)
 	pTask[task_n]->ready_time = max_ready_time;
 	return ;
 }
- 
+
 float main_class::exe_time(int task_n, int node_n, int proc_cpu, int proc_gpu)
 {	//返回计算消耗的时间长度
 	//这里做一个简化，认为数据到达本节点后，CPU可以立即开始计算，同时数据通过PCI向GPU传输，
@@ -280,9 +280,15 @@ float main_class::exe_time(int task_n, int node_n, int proc_cpu, int proc_gpu)
 	cpu_time = pTask[task_n]->computation_cpu_logic / pNode[node_n]->cpu_speed_logic[proc_cpu]
 				+ pTask[task_n]->computation_cpu_arith / pNode[node_n]->cpu_speed_arith[proc_cpu];
 	
+	if (pNode[node_n]->cpu_speed_logic[proc_cpu]==0 || pNode[node_n]->cpu_speed_arith[proc_cpu]==0)
+		cout << "Divided by zero" << endl;
+	
 	gpu_time = 2 * pTask[task_n]->data_volume / pNode[node_n]->gpu_bandwidth[proc_gpu]
 				+ pTask[task_n]->computation_gpu_logic / pNode[node_n]->gpu_speed_logic[proc_gpu]
-				+ pTask[task_n]->computation_cpu_arith / pNode[node_n]->gpu_speed_arith[proc_gpu];
+				+ pTask[task_n]->computation_gpu_arith / pNode[node_n]->gpu_speed_arith[proc_gpu];
+	
+	if(pNode[node_n]->gpu_bandwidth[proc_gpu]==0 || pNode[node_n]->gpu_speed_logic[proc_gpu]==0 || pNode[node_n]->gpu_speed_arith[proc_gpu]==0)
+		cout << "Divided by zero" << endl;
 	
 	if (cpu_time > gpu_time)
 		return cpu_time;
@@ -292,6 +298,7 @@ float main_class::exe_time(int task_n, int node_n, int proc_cpu, int proc_gpu)
 
 float main_class::eth_transfer_time(int task_n, int node_n)
 {	//返回所有前驱节点的数据通过网络传输到计算节点的时间点
+	//这里允许运行结束的前驱节点马上向后继节点传输数据，而不是等待所有前驱都完成后才开始数据传输
 	float max_time, temp_max_time;
 	max_time = pTask[task_n]->ready_time;
 	for(int i=0;i<dependency_num;i++)
@@ -300,17 +307,21 @@ float main_class::eth_transfer_time(int task_n, int node_n)
 		{
 			int temp_output_task = pDependency[i]->output_task;
 			int temp_output_node = pTask[temp_output_task]->assign_node;
-			float temp_bandwidth = (pNode[node_n]->eth_bandwidth > pNode[temp_output_node]->eth_bandwidth) ? 
-										pNode[temp_output_node]->eth_bandwidth : pNode[node_n]->eth_bandwidth;
+			float temp_bandwidth = (pNode[node_n]->eth_bandwidth > pNode[temp_output_node]->eth_bandwidth)?pNode[temp_output_node]->eth_bandwidth : pNode[node_n]->eth_bandwidth;
+			
+			if(temp_bandwidth==0)
+				cout << "Divided by zero" << endl;
+			
+			//两个主机之间的带宽去两者带宽的较小者
 			if (pTask[temp_output_task]->finish_time < 0)
 				cout << "Have not finish error, cannot execute  main:eth_transfer_time" << endl;
 				//上面这句是为了检错
-			if (task_n != temp_output_task)
+			if (node_n != temp_output_node)
 			{
 				temp_max_time = pTask[temp_output_task]->finish_time + pDependency[i]->data_volume / temp_bandwidth;
 			}else
 			{	//同一节点内数据传输时间为零
-				temp_max_time = 0;
+				temp_max_time = pTask[temp_output_task]->finish_time + 0;
 			}
 			if(temp_max_time > max_time)
 			{	
@@ -406,15 +417,21 @@ void main_class::schedule()
 			}
 		}
 		
+		if(earlist_ready_task<0)
+			cout << "schedule task error: earlist_ready_task=" << earlist_ready_task << endl;
+		
 		//分别找出ready_time最早的node
 		//node的ready_time等于其中最早CPU与最早GPU的ready_time的较大值，即最早何时能同时拿出一个CPU和一个GPU
 		//下面的代码需要修改
 		int earlist_ready_node = 0, earlist_ready_node_cpu = 0, earlist_ready_node_gpu = 0;
-		int earlist_ready_cpu_proc = 0;
-		float earlist_ready_cpu_time = pNode[0]->cpu_ready_time[0];
-		int earlist_ready_gpu_proc = 0;
+		
+		int earlist_ready_cpu_proc = 0;	//临时变量
+		float earlist_ready_cpu_time = pNode[0]->cpu_ready_time[0];	//初始化
+		
+		int earlist_ready_gpu_proc = 0;	//临时变量
 		float earlist_ready_gpu_time = pNode[0]->gpu_ready_time[0];
-		float earlist_ready_node_time;
+		
+		float earlist_ready_node_time;	//临时变量
 		earlist_ready_node_time = earlist_ready_cpu_time>earlist_ready_gpu_time?earlist_ready_cpu_time:earlist_ready_gpu_time;
 		for (int i=0;i<node_num;i++)
 		{
@@ -447,7 +464,11 @@ void main_class::schedule()
 		}
 		pTask[earlist_ready_task]->data_ready_time = eth_transfer_time(earlist_ready_task, earlist_ready_node);
 		assign(earlist_ready_task, earlist_ready_node, earlist_ready_node_cpu, earlist_ready_node_gpu);
+		cout << "assign task " << earlist_ready_task << " on node " << earlist_ready_node << 
+			" CPU:" << earlist_ready_node_cpu << " GPU:" << earlist_ready_node_gpu << " Time:" << pTask[earlist_ready_task]->begin_time <<
+			" - " << pTask[earlist_ready_task]->finish_time << endl;
 		task_count--;
+		cout << "Schedule " << task_num - task_count << " tasks" << endl;
 	}
 	
 	float last_task_time = pTask[0]->finish_time;
@@ -476,9 +497,9 @@ int main()
 //		cout << "Parameter number error" << endl;
 	main_class *mMain = new main_class();
 	mMain->readin_data();
-//	cout << "readin_data success" << endl;
+	cout << "readin_data success" << endl;
 	mMain->schedule();
-//	cout << "schedule success" << endl;
+	cout << "schedule success" << endl;
 	delete mMain;
 	system("pause");
 	return 0;

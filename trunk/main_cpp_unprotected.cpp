@@ -69,7 +69,7 @@ class main_class
 	public:
 		main_class();
 		~main_class();
-		void readin_data();
+		void readin_data(char *mac_in, char *dag_in);
 		void schedule();
 		float eth_transfer_time(int task_n, int node_n);
 		void assign(int task_n, int node_n, int proc, int proc_n);
@@ -188,10 +188,11 @@ main_class::~main_class()
 	}
 }
 
-void main_class::readin_data()
+void main_class::readin_data(char *mac_in, char *dag_in)
 {	//从文件中读取测试数据
 	ifstream i_file;
-	i_file.open("Machine.in1.txt");
+	i_file.open(mac_in);
+//	i_file.open("Machine.in1.txt");
 //	i_file.open("data.in", ifstream::in);
 	
 	i_file >> node_num;
@@ -216,7 +217,8 @@ void main_class::readin_data()
 	
 	i_file.close();
 //	i_file.open("DAG.in1.txt");
-	i_file.open("DAG.dup.in1.txt");
+//	i_file.open("DAG.dup.in1.txt");
+	i_file.open(dag_in);
 	
 	i_file >> task_num;
 //	cout << "task_num" << task_num << endl;
@@ -506,13 +508,13 @@ void main_class::schedule()
 	cout << last_task_time << endl;
 }
 
-//int main(int argc, char *argv[])
-int main()
+int main(int argc, char *argv[])
+//int main()
 {
-//	if (argc != 3)
-//		cout << "Parameter number error" << endl;
+	if (argc != 3)
+		cout << "Parameter number error" << endl;
 	main_class *mMain = new main_class();
-	mMain->readin_data();
+	mMain->readin_data(argv[1], argv[2]);
 //	cout << "readin_data success" << endl;
 	mMain->schedule();
 //	cout << "schedule success" << endl;

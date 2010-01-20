@@ -1,3 +1,5 @@
+system("del result.txt");
+
 my $dag_num=10;
 my $dag=0;
 my $mac_num=10;
@@ -11,7 +13,7 @@ for($mac=1;$mac<=$mac_num;$mac++)
 	for($dag=1;$dag<=$dag_num;$dag++)
 	{
 		$mac_file_name = "Machine.in".$mac.".txt";
-		$dag_file_name = "DAG.in".$dag.".txt";
+		$dag_file_name = "DAG.dup.in".$dag.".txt";
 #		print $mac_file_name;
 #		system("echo $file_name");
 #		system("echo $file_name >>result.txt");
@@ -19,4 +21,4 @@ for($mac=1;$mac<=$mac_num;$mac++)
 		system("main_cpp_unprotected.exe $mac_file_name $dag_file_name >> result.txt");
 	}
 }
-print "end\n";
+

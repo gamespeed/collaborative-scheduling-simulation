@@ -75,6 +75,7 @@ class main_class
 		void assign(int task_n, int node_n, int proc, int proc_n);
 		float exe_time(int task_n, int node_n, int proc_cpu, int proc_gpu);
 		void get_ready_time(int task_n);
+//		void writefile(char *util, char *mkspan);
 	private:
 		task *pTask[MAX_TASK_NUM];
 		int task_num;
@@ -82,6 +83,7 @@ class main_class
 		int node_num;
 		dependency *pDependency[MAX_DEPENDENCY_NUM];
 		int dependency_num;
+		float makespan;
 };
 
 task::task()
@@ -158,6 +160,7 @@ main_class::main_class()
 	task_num = 0;
 	node_num = 0;
 	dependency_num = 0;
+	makespan = 0;
 	for(int i=0;i<MAX_TASK_NUM;i++)
 	{
 		pTask[i] = NULL;
@@ -501,12 +504,29 @@ void main_class::schedule()
 	{
 //		cout << "Node:" << i << " CPU Utilization Rate:" << pNode[i]->cpu_utilized_time / pNode[i]->cpu_num / last_task_time << endl;
 //		cout << "Node:" << i << " GPU Utilization Rate:" << pNode[i]->gpu_utilized_time / pNode[i]->gpu_num / last_task_time << endl;
-		cout << pNode[i]->cpu_utilized_time / pNode[i]->cpu_num / last_task_time << " ";
-		cout << pNode[i]->gpu_utilized_time / pNode[i]->gpu_num / last_task_time << endl;
+//		cout << pNode[i]->cpu_utilized_time / pNode[i]->cpu_num / last_task_time << " ";
+//		cout << pNode[i]->gpu_utilized_time / pNode[i]->gpu_num / last_task_time << endl;
 	}
 //	cout << "The makespan :" << last_task_time << endl;
 	cout << last_task_time << endl;
 }
+
+/* void main_class::writefile(char *util, char *mkspan)
+{
+	ofstream o_file;
+	o_file.open(util);
+	
+	for(int i=0;i<node_num;i++)
+	{
+		cout << pNode[i]->cpu_utilized_time / pNode[i]->cpu_num / makespan << "";
+		cout << pNode[i]->gpu_utilized_time / pNode[i]->gpu_num / makespan << endl;
+	}
+	
+	o_file.close();
+	o_file.open(mkspan);
+	
+	cout << makespan << endl;
+} */
 
 int main(int argc, char *argv[])
 //int main()
@@ -517,6 +537,7 @@ int main(int argc, char *argv[])
 	mMain->readin_data(argv[1], argv[2]);
 //	cout << "readin_data success" << endl;
 	mMain->schedule();
+//	mMain->writefile(argv[3],argv[4]);
 //	cout << "schedule success" << endl;
 	delete mMain;
 //	system("pause");

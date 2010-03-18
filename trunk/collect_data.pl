@@ -4,11 +4,13 @@ my $total_cpu;
 my $total_gpu;
 my $test1,$test2;
 my $proc_num;
+$proc_num = 0;
 while($record=<FILE>)
 {
 	$total = $total + $record;
+	$proc_num = $proc_num + 1;
 }
-print "Makespan:".$total/100;
+print "Makespan:".$total/$proc_num;
 print "\n";
 #system("pause");
 
